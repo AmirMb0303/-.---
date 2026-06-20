@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Плиссе производство — веб-копия Excel</title>
+<style>
+  :root{--border:#111;--bg:#fff;--ui:#f3f4f6;--text:#111}
+  body{margin:0;background:#e5e7eb;color:var(--text);font-family:Arial, sans-serif}
+  .toolbar{position:sticky;top:0;z-index:10;background:#111827;color:white;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .toolbar button{border:0;border-radius:6px;padding:8px 12px;cursor:pointer;background:#fff;color:#111;font-weight:600}
+  .toolbar .hint{font-size:13px;opacity:.9}
+  .page{width:210mm;min-height:297mm;margin:14px auto;background:var(--bg);box-shadow:0 2px 12px rgba(0,0,0,.18);padding:10mm 8mm;box-sizing:border-box}
+  table.sheet{border-collapse:collapse;width:100%;table-layout:fixed;font-family:"Times New Roman", serif;font-size:18px}
+  .sheet th,.sheet td{border:2px solid var(--border);height:24px;text-align:center;vertical-align:middle;padding:0 4px;box-sizing:border-box;line-height:1.05}
+  .sheet th{font-weight:700;background:#fff}
+  .sheet input{width:100%;height:100%;border:0;outline:none;text-align:center;font:inherit;font-family:"Times New Roman", serif;background:transparent;padding:0;box-sizing:border-box}
+  .sheet input:focus{background:#fff7cc;box-shadow:inset 0 0 0 2px #f59e0b}
+  .col-no{width:8mm}.col-fabric{width:25mm}.col-num{width:18mm}.col-width{width:23mm}.col-height{width:21mm}.col-profile{width:25mm}.col-folds{width:26mm}.col-color{width:21mm}.col-thread{width:28mm}
+  .small{font-size:17px}.calc{background:#fff}
+  @media print{
+    body{background:white;margin:0}.toolbar{display:none}.page{box-shadow:none;margin:0;width:auto;min-height:auto;padding:0}.sheet th,.sheet td{border:1.8px solid #000} @page{size:A4 portrait;margin:10mm 8mm}
+    .sheet input:focus{background:transparent;box-shadow:none}
+  }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <button onclick="window.print()">Печать</button>
+  <button onclick="addRow()">Добавить строку</button>
+  <button onclick="clearRows()">Очистить</button>
+  <span class="hint">Заполняйте белые ячейки. Складки и длина нитки считаются автоматически.</span>
+</div>
+<div class="page">
+<table class="sheet" id="sheet">
+  <colgroup>
+    <col class="col-no"><col class="col-fabric"><col class="col-num"><col class="col-width"><col class="col-height"><col class="col-profile"><col class="col-folds"><col class="col-color"><col class="col-thread">
+  </colgroup>
+  <thead>
+    <tr><th rowspan="2">№</th><th rowspan="2">Ткань</th><th rowspan="2">Номер</th><th rowspan="2">Ширина</th><th rowspan="2">Высота</th><th rowspan="2">Профиль</th><th rowspan="2" class="small">Складки,<br>шт</th><th colspan="2">Нитка</th></tr>
+    <tr><th>Цвет</th><th>Длина, см</th></tr>
+  </thead>
+  <tbody id="body"></tbody>
+</table>
+</div>
+<script>
+const START_ROWS = 48;
+const firstRow = {no:'', fabric:'Лиссабон', num:'1', width:'50', height:'150', profile:'Серый', color:'Коричн'};
+function n(v){ const x = parseFloat(String(v).replace(',', '.')); return Number.isFinite(x) ? x : 0; }
+function fmt(x){ return Math.round(x).toString(); }
+function foldCount(height){ const h=n(height); if(h>50) return h/2.2; if(h<=50) return h/2.1; return 0; }
+function threadLength(width,height){ return (n(width)+n(width)+n(height))*2+30; }
+function makeCell(row,key,value='',editable=true){
+  const td=document.createElement('td');
+  if(editable){ const inp=document.createElement('input'); inp.value=value; inp.dataset.key=key; inp.addEventListener('input',()=>recalc(row)); td.appendChild(inp); }
+  else { td.className='calc'; td.dataset.key=key; td.textContent=value; }
+  return td;
+}
+function rowData(tr){ const get=k=>tr.querySelector(`[data-key="${k}"]`)?.value ?? ''; return {width:get('width'),height:get('height')}; }
+function recalc(tr){ const d=rowData(tr); tr.querySelector('[data-key="folds"]').textContent=fmt(foldCount(d.height)); tr.querySelector('[data-key="thread"]').textContent=fmt(threadLength(d.width,d.height)); save(); }
+function createRow(data={}){
+  const tr=document.createElement('tr');
+  tr.appendChild(makeCell(tr,'no',data.no||''));
+  tr.appendChild(makeCell(tr,'fabric',data.fabric||''));
+  tr.appendChild(makeCell(tr,'num',data.num||''));
+  tr.appendChild(makeCell(tr,'width',data.width||''));
+  tr.appendChild(makeCell(tr,'height',data.height||''));
+  tr.appendChild(makeCell(tr,'profile',data.profile||''));
+  tr.appendChild(makeCell(tr,'folds','0',false));
+  tr.appendChild(makeCell(tr,'color',data.color||''));
+  tr.appendChild(makeCell(tr,'thread','30',false));
+  document.getElementById('body').appendChild(tr); recalc(tr);
+}
+function addRow(){ createRow(); save(); }
+function getAllRows(){ return [...document.querySelectorAll('#body tr')].map(tr=>{ const obj={}; tr.querySelectorAll('input').forEach(i=>obj[i.dataset.key]=i.value); return obj; }); }
+function save(){ localStorage.setItem('plisseRows', JSON.stringify(getAllRows())); }
+function clearRows(){ if(!confirm('Очистить все строки?')) return; localStorage.removeItem('plisseRows'); document.getElementById('body').innerHTML=''; createRow(firstRow); for(let i=1;i<START_ROWS;i++) createRow(); }
+(function init(){
+  const saved=localStorage.getItem('plisseRows');
+  const rows=saved ? JSON.parse(saved) : [firstRow, ...Array(START_ROWS-1).fill({})];
+  rows.forEach(createRow);
+})();
+</script>
+</body>
+</html>
