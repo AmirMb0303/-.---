@@ -19,6 +19,14 @@
   .col-no{width:8mm}.col-fabric{width:25mm}.col-num{width:18mm}.col-width{width:23mm}.col-height{width:21mm}.col-profile{width:25mm}.col-folds{width:26mm}.col-color{width:21mm}.col-thread{width:28mm}
   .small{font-size:17px}.calc{background:#fff}
 
+  .sheet td{cursor:cell;position:relative}
+  .sheet td.selected-cell{background:#bfdbfe!important;box-shadow:inset 0 0 0 2px #2563eb}
+  .sheet td.selected-cell input{background:#bfdbfe!important}
+  .sheet td.selected-cell.calc{background:#bfdbfe!important}
+  .sheet tr.sort-row td{background:#dbeafe}
+  .sheet tr.sort-row input{background:#dbeafe}
+
+
   .sheet tr.selected-row td{background:#dbeafe}
   .sheet tr.selected-row input{background:#dbeafe}
   .sheet tr.selected-row input:focus{background:#fff7cc}
@@ -228,10 +236,10 @@ async function sharePdfFile(event) {
   <button type="button" onclick="printDocument()">Печать</button>
   <button type="button" onclick="sharePdfFile(event)">Поделиться PDF</button>
   <button onclick="addRow()">Добавить строку</button>
-  <button type="button" onclick="sortSelectedRows()">Сортировать выделенное</button>
-  <button type="button" onclick="clearSelection()">Снять выделение</button>
+  <button type="button" onclick="sortSelectedCellsRows()">Сортировать выделенное</button>
+  <button type="button" onclick="clearCellSelection()">Снять выделение</button>
   <button onclick="clearRows()">Очистить</button>
-  <span class="hint">Заполняйте белые ячейки. Для сортировки нажмите на строки, затем «Сортировать выделенное».</span>
+  <span class="hint">Клик по ячейкам выделяет их как в Excel. Для сортировки выделите ячейки нужных строк.</span>
 </div>
 <div class="page">
 <table class="sheet" id="sheet">
@@ -331,6 +339,119 @@ function sortSelectedRows(){
   save();
 }
 
+
+let isSelectingCells = false;
+let selectionModeAdd = true;
+
+function isToolbarTarget(el){
+  return el && (el.tagName === 'BUTTON' || el.closest('.toolbar'));
+}
+
+function cellFromTarget(target){
+  if (!target) return null;
+  return target.closest ? target.closest('#body td') : null;
+}
+
+function toggleCell(td, force){
+  if (!td) return;
+  if (typeof force === 'boolean') td.classList.toggle('selected-cell', force);
+  else td.classList.toggle('selected-cell');
+}
+
+function clearCellSelection(){
+  document.querySelectorAll('#body td.selected-cell').forEach(td => td.classList.remove('selected-cell'));
+  document.querySelectorAll('#body tr.sort-row').forEach(tr => tr.classList.remove('sort-row'));
+}
+
+function addCellSelectionHandlers(tr){
+  tr.querySelectorAll('td').forEach(td => {
+    td.addEventListener('mousedown', function(e){
+      if (e.button !== 0 || isToolbarTarget(e.target)) return;
+
+      // Ctrl/Cmd click adds/removes without clearing. Normal click starts a new Excel-like selection.
+      if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        clearCellSelection();
+      }
+
+      isSelectingCells = true;
+      selectionModeAdd = !td.classList.contains('selected-cell');
+      toggleCell(td, selectionModeAdd);
+
+      // Prevent text selection while dragging across cells, but still allow input focus on click.
+      e.preventDefault();
+    });
+
+    td.addEventListener('mouseenter', function(){
+      if (!isSelectingCells) return;
+      toggleCell(td, selectionModeAdd);
+    });
+
+    td.addEventListener('click', function(e){
+      // One click selects the cell. Double click inside an input lets the user edit.
+      const inp = td.querySelector('input');
+      if (inp && e.detail >= 2) {
+        inp.focus();
+        inp.select();
+      }
+    });
+  });
+}
+
+document.addEventListener('mouseup', function(){
+  isSelectingCells = false;
+});
+
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape') clearCellSelection();
+});
+
+function selectedRowsFromCells(){
+  const rows = [];
+  const seen = new Set();
+
+  document.querySelectorAll('#body td.selected-cell').forEach(td => {
+    const tr = td.closest('tr');
+    if (tr && !seen.has(tr)) {
+      seen.add(tr);
+      rows.push(tr);
+    }
+  });
+
+  return rows;
+}
+
+function sortSelectedCellsRows(){
+  const selected = selectedRowsFromCells();
+
+  if (selected.length < 2) {
+    alert('Выделите ячейки минимум в 2 строках для сортировки.');
+    return;
+  }
+
+  const data = selected.map((tr, index) => ({
+    index,
+    row: getRowObject(tr)
+  }));
+
+  data.sort((a, b) => {
+    const aw = n(a.row.width);
+    const bw = n(b.row.width);
+    const ah = n(a.row.height);
+    const bh = n(b.row.height);
+
+    if (aw !== bw) return aw - bw;
+    if (ah !== bh) return ah - bh;
+    return a.index - b.index;
+  });
+
+  selected.forEach((tr, i) => {
+    setRowObject(tr, data[i].row);
+    tr.classList.add('sort-row');
+  });
+
+  save();
+}
+
 function createRow(data={}){
   const tr=document.createElement('tr');
   tr.appendChild(makeCell(tr,'no',data.no||''));
@@ -342,7 +463,7 @@ function createRow(data={}){
   tr.appendChild(makeCell(tr,'folds','0',false));
   tr.appendChild(makeCell(tr,'color',data.color||''));
   tr.appendChild(makeCell(tr,'thread','30',false));
-  document.getElementById('body').appendChild(tr); addRowSelectionHandler(tr); recalc(tr);
+  document.getElementById('body').appendChild(tr); addCellSelectionHandlers(tr); recalc(tr);
 }
 function addRow(){ createRow(); save(); }
 function getAllRows(){ return [...document.querySelectorAll('#body tr')].map(tr=>{ const obj={}; tr.querySelectorAll('input').forEach(i=>obj[i.dataset.key]=i.value); return obj; }); }
