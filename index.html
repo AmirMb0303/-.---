@@ -26,7 +26,8 @@
 </head>
 <body>
 <div class="toolbar">
-  <button onclick="printDocument()">Печать</button>
+  <button type="button" onclick="printDocument()">Печать</button>
+  <button type="button" onclick="shareOrPrint()">Поделиться / PDF</button>
   <button onclick="addRow()">Добавить строку</button>
   <button onclick="clearRows()">Очистить</button>
   <span class="hint">Заполняйте белые ячейки. Складки и длина нитки считаются автоматически.</span>
@@ -82,12 +83,33 @@ function clearRows(){ if(!confirm('Очистить все строки?')) retu
 })();
 
 function printDocument() {
+  try {
+    save();
+  } catch (e) {}
   window.focus();
-  setTimeout(() => {
-    window.print();
-  }, 300);
-}
-</script>
 
+  // Main print call. Works in Chrome/Edge/desktop Safari.
+  try {
+    window.print();
+  } catch (e) {
+    alert('Если печать не открылась: нажмите кнопку «Поделиться / PDF» или меню браузера → Печать.');
+  }
+}
+
+async function shareOrPrint() {
+  try {
+    if (navigator.share) {
+      await navigator.share({
+        title: document.title,
+        url: window.location.href
+      });
+      return;
+    }
+  } catch (e) {}
+
+  alert('На iPhone: нажмите кнопку «Поделиться» в Safari → Печать → Сохранить как PDF или распечатать.');
+}
+
+</script>
 </body>
 </html>
