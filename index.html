@@ -14,232 +14,35 @@
   table.sheet{border-collapse:collapse;width:100%;table-layout:fixed;font-family:"Times New Roman", serif;font-size:18px}
   .sheet th,.sheet td{border:2px solid var(--border);height:24px;text-align:center;vertical-align:middle;padding:0 4px;box-sizing:border-box;line-height:1.05}
   .sheet th{font-weight:700;background:#fff}
-  .sheet input{width:100%;height:100%;border:0;outline:none;text-align:center;font:inherit;font-family:"Times New Roman", serif;background:transparent;padding:0;box-sizing:border-box;user-select:text}
-  .sheet input:focus{background:#fff7cc;box-shadow:inset 0 0 0 2px #f59e0b}
-  .col-no{width:8mm}.col-fabric{width:25mm}.col-num{width:18mm}.col-width{width:23mm}.col-height{width:21mm}.col-profile{width:25mm}.col-folds{width:26mm}.col-color{width:21mm}.col-thread{width:28mm}
-  .small{font-size:17px}.calc{background:#fff}
-
   .sheet td{cursor:cell;position:relative;user-select:none}
   .sheet td.selected-cell{background:#bfdbfe!important;box-shadow:inset 0 0 0 2px #2563eb}
   .sheet td.selected-cell input{background:#bfdbfe!important}
-  .sheet td.selected-cell.calc{background:#bfdbfe!important}
   .sheet tr.sort-row td{background:#dbeafe}
   .sheet tr.sort-row input{background:#dbeafe}
-
-
-  .sheet tr.selected-row td{background:#dbeafe}
-  .sheet tr.selected-row input{background:#dbeafe}
-  .sheet tr.selected-row input:focus{background:#fff7cc}
-
+  .sheet input{width:100%;height:100%;border:0;outline:none;text-align:center;font:inherit;font-family:"Times New Roman", serif;background:transparent;padding:0;box-sizing:border-box;pointer-events:none;user-select:text}
+  .sheet input.editing{pointer-events:auto;background:#fff7cc!important;box-shadow:inset 0 0 0 2px #f59e0b}
+  .sheet input:focus{background:#fff7cc;box-shadow:inset 0 0 0 2px #f59e0b}
+  .col-no{width:8mm}.col-fabric{width:25mm}.col-num{width:18mm}.col-width{width:23mm}.col-height{width:21mm}.col-profile{width:25mm}.col-folds{width:26mm}.col-color{width:21mm}.col-thread{width:28mm}
+  .small{font-size:17px}.calc{background:#fff}
   @media print{
     body{background:white;margin:0}.toolbar{display:none}.page{box-shadow:none;margin:0;width:auto;min-height:auto;padding:0}.sheet th,.sheet td{border:1.8px solid #000} @page{size:A4 portrait;margin:10mm 8mm}
     .sheet input:focus{background:transparent;box-shadow:none}
   }
 </style>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js">
-function printDocument() {
-  try { save(); } catch (e) {}
-  window.focus();
-  window.print();
-}
-
-async function makePdfBlob() {
-  try { save(); } catch (e) {}
-
-  const page = document.querySelector('.page');
-  if (!page) throw new Error('Не найдена область страницы для PDF.');
-
-  const canvas = await html2canvas(page, {
-    scale: 2,
-    useCORS: true,
-    backgroundColor: '#ffffff',
-    scrollX: 0,
-    scrollY: -window.scrollY
-  });
-
-  const imgData = canvas.toDataURL('image/jpeg', 0.98);
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF('p', 'mm', 'a4');
-
-  const pageWidth = 210;
-  const pageHeight = 297;
-  const marginX = 8;
-  const marginY = 10;
-  const usableWidth = pageWidth - marginX * 2;
-  const usableHeight = pageHeight - marginY * 2;
-
-  const imgWidth = usableWidth;
-  const imgHeight = canvas.height * imgWidth / canvas.width;
-
-  if (imgHeight <= usableHeight) {
-    pdf.addImage(imgData, 'JPEG', marginX, marginY, imgWidth, imgHeight);
-  } else {
-    let heightLeft = imgHeight;
-    let position = marginY;
-    pdf.addImage(imgData, 'JPEG', marginX, position, imgWidth, imgHeight);
-    heightLeft -= usableHeight;
-
-    while (heightLeft > 0) {
-      pdf.addPage();
-      position = marginY - (imgHeight - heightLeft);
-      pdf.addImage(imgData, 'JPEG', marginX, position, imgWidth, imgHeight);
-      heightLeft -= usableHeight;
-    }
-  }
-
-  return pdf.output('blob');
-}
-
-async function sharePdfFile(event) {
-  const btn = event && event.currentTarget ? event.currentTarget : null;
-  const oldText = btn ? btn.textContent : '';
-
-  try {
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = 'Создаём PDF...';
-    }
-
-    const pdfBlob = await makePdfBlob();
-    const file = new File([pdfBlob], 'plisse_raschet.pdf', { type: 'application/pdf' });
-
-    if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
-      await navigator.share({
-        title: 'Расчёт плиссе',
-        text: 'Расчёт плиссе в PDF',
-        files: [file]
-      });
-    } else {
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'plisse_raschet.pdf';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      alert('PDF сохранён. Теперь его можно отправить через WhatsApp.');
-    }
-  } catch (err) {
-    alert('Не удалось создать PDF. Попробуйте открыть страницу в Safari/Chrome и нажать «Поделиться PDF» ещё раз.');
-    console.error(err);
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = oldText || 'Поделиться PDF';
-    }
-  }
-}
-
-</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js">
-function printDocument() {
-  try { save(); } catch (e) {}
-  window.focus();
-  window.print();
-}
-
-async function makePdfBlob() {
-  try { save(); } catch (e) {}
-
-  const page = document.querySelector('.page');
-  if (!page) throw new Error('Не найдена область страницы для PDF.');
-
-  const canvas = await html2canvas(page, {
-    scale: 2,
-    useCORS: true,
-    backgroundColor: '#ffffff',
-    scrollX: 0,
-    scrollY: -window.scrollY
-  });
-
-  const imgData = canvas.toDataURL('image/jpeg', 0.98);
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF('p', 'mm', 'a4');
-
-  const pageWidth = 210;
-  const pageHeight = 297;
-  const marginX = 8;
-  const marginY = 10;
-  const usableWidth = pageWidth - marginX * 2;
-  const usableHeight = pageHeight - marginY * 2;
-
-  const imgWidth = usableWidth;
-  const imgHeight = canvas.height * imgWidth / canvas.width;
-
-  if (imgHeight <= usableHeight) {
-    pdf.addImage(imgData, 'JPEG', marginX, marginY, imgWidth, imgHeight);
-  } else {
-    let heightLeft = imgHeight;
-    let position = marginY;
-    pdf.addImage(imgData, 'JPEG', marginX, position, imgWidth, imgHeight);
-    heightLeft -= usableHeight;
-
-    while (heightLeft > 0) {
-      pdf.addPage();
-      position = marginY - (imgHeight - heightLeft);
-      pdf.addImage(imgData, 'JPEG', marginX, position, imgWidth, imgHeight);
-      heightLeft -= usableHeight;
-    }
-  }
-
-  return pdf.output('blob');
-}
-
-async function sharePdfFile(event) {
-  const btn = event && event.currentTarget ? event.currentTarget : null;
-  const oldText = btn ? btn.textContent : '';
-
-  try {
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = 'Создаём PDF...';
-    }
-
-    const pdfBlob = await makePdfBlob();
-    const file = new File([pdfBlob], 'plisse_raschet.pdf', { type: 'application/pdf' });
-
-    if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
-      await navigator.share({
-        title: 'Расчёт плиссе',
-        text: 'Расчёт плиссе в PDF',
-        files: [file]
-      });
-    } else {
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'plisse_raschet.pdf';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      alert('PDF сохранён. Теперь его можно отправить через WhatsApp.');
-    }
-  } catch (err) {
-    alert('Не удалось создать PDF. Попробуйте открыть страницу в Safari/Chrome и нажать «Поделиться PDF» ещё раз.');
-    console.error(err);
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = oldText || 'Поделиться PDF';
-    }
-  }
-}
-
-</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 </head>
 <body>
 <div class="toolbar">
   <button type="button" onclick="printDocument()">Печать</button>
   <button type="button" onclick="sharePdfFile(event)">Поделиться PDF</button>
-  <button onclick="addRow()">Добавить строку</button>
+  <button type="button" onclick="addRow()">Добавить строку</button>
   <button type="button" onclick="sortSelectedCellsRows()">Сортировать выделенное</button>
   <button type="button" onclick="clearCellSelection()">Снять выделение</button>
-  <button onclick="clearRows()">Очистить</button>
-  <span class="hint">Клик по ячейкам выделяет их как в Excel. Для сортировки выделите ячейки нужных строк.</span>
+  <button type="button" onclick="clearRows()">Очистить</button>
+  <span class="hint">Клик по ячейке — выделение. Двойной клик — редактирование. Сортировка: ширина ↑, высота ↑.</span>
 </div>
 <div class="page">
 <table class="sheet" id="sheet">
@@ -255,97 +58,108 @@ async function sharePdfFile(event) {
 </div>
 <script>
 const START_ROWS = 48;
-const firstRow = {no:'', fabric:'Лиссабон', num:'1', width:'50', height:'150', profile:'Серый', color:'Коричн'};
-function n(v){ const x = parseFloat(String(v).replace(',', '.')); return Number.isFinite(x) ? x : 0; }
-function fmt(x){ return Math.round(x).toString(); }
-function foldCount(height){ const h=n(height); if(h>50) return h/2.2; if(h<=50) return h/2.1; return 0; }
-function threadLength(width,height){ return (n(width)+n(width)+n(height))*2+30; }
-function makeCell(row,key,value='',editable=true){
-  const td=document.createElement('td');
-  if(editable){ const inp=document.createElement('input'); inp.value=value; inp.dataset.key=key; inp.addEventListener('input',()=>recalc(row)); td.appendChild(inp); }
-  else { td.className='calc'; td.dataset.key=key; td.textContent=value; }
-  return td;
-}
-function rowData(tr){ const get=k=>tr.querySelector(`[data-key="${k}"]`)?.value ?? ''; return {width:get('width'),height:get('height')}; }
-function recalc(tr){ const d=rowData(tr); tr.querySelector('[data-key="folds"]').textContent=fmt(foldCount(d.height)); tr.querySelector('[data-key="thread"]').textContent=fmt(threadLength(d.width,d.height)); save(); }
-
-function getRowObject(tr){
-  const obj = {};
-  tr.querySelectorAll('input').forEach(i => obj[i.dataset.key] = i.value);
-  return obj;
-}
-
-function setRowObject(tr, obj){
-  tr.querySelectorAll('input').forEach(i => {
-    i.value = obj[i.dataset.key] || '';
-  });
-  recalc(tr);
-}
-
-function isEditableTarget(el){
-  return el && (el.tagName === 'INPUT' || el.tagName === 'BUTTON' || el.closest('button'));
-}
-
-function toggleRowSelection(tr){
-  if (!tr) return;
-  tr.classList.toggle('selected-row');
-}
-
-function clearSelection(){
-  document.querySelectorAll('#body tr.selected-row').forEach(tr => tr.classList.remove('selected-row'));
-}
-
-function addRowSelectionHandler(tr){
-  tr.addEventListener('click', function(e){
-    if (isEditableTarget(e.target)) return;
-    toggleRowSelection(tr);
-  });
-
-  tr.addEventListener('dblclick', function(e){
-    if (isEditableTarget(e.target)) return;
-    toggleRowSelection(tr);
-  });
-}
-
-function sortSelectedRows(){
-  const selected = [...document.querySelectorAll('#body tr.selected-row')];
-
-  if (selected.length < 2) {
-    alert('Выделите минимум 2 строки для сортировки.');
-    return;
-  }
-
-  const data = selected.map((tr, index) => ({
-    index,
-    row: getRowObject(tr)
-  }));
-
-  data.sort((a, b) => {
-    const aw = n(a.row.width);
-    const bw = n(b.row.width);
-    const ah = n(a.row.height);
-    const bh = n(b.row.height);
-
-    if (aw !== bw) return aw - bw;
-    if (ah !== bh) return ah - bh;
-    return a.index - b.index;
-  });
-
-  selected.forEach((tr, i) => {
-    setRowObject(tr, data[i].row);
-    tr.classList.add('selected-row');
-  });
-
-  save();
-}
-
-
+const firstRow = {no:'1', fabric:'Лиссабон', num:'1', width:'50', height:'150', profile:'Серый', color:'Коричн'};
 
 let isSelectingCells = false;
 let selectionModeAdd = true;
 let lastPointerCell = null;
-let lastClickTime = 0;
-let lastClickCell = null;
+
+function n(v){ const x = parseFloat(String(v).replace(',', '.')); return Number.isFinite(x) ? x : 0; }
+function fmt(x){ return Math.round(x).toString(); }
+function foldCount(height){ const h=n(height); if(h>50) return h/2.2; if(h<=50 && h>0) return h/2.1; return 0; }
+function threadLength(width,height){ return (n(width)+n(width)+n(height))*2+30; }
+
+function makeCell(row,key,value='',editable=true){
+  const td=document.createElement('td');
+  td.dataset.cellKey = key;
+
+  if(editable){
+    const inp=document.createElement('input');
+    inp.value=value;
+    inp.dataset.key=key;
+    inp.readOnly = true;
+
+    inp.addEventListener('input',()=>recalc(row));
+    inp.addEventListener('blur',()=>{
+      inp.readOnly = true;
+      inp.classList.remove('editing');
+      save();
+    });
+    inp.addEventListener('keydown',(e)=>{
+      if(e.key === 'Enter'){
+        inp.blur();
+        e.preventDefault();
+      }
+    });
+
+    td.appendChild(inp);
+  } else {
+    td.className='calc';
+    td.dataset.key=key;
+    td.textContent=value;
+  }
+
+  return td;
+}
+
+function rowData(tr){
+  const get=k=>tr.querySelector(`[data-key="${k}"]`)?.value ?? '';
+  return {width:get('width'),height:get('height')};
+}
+
+function recalc(tr){
+  const d=rowData(tr);
+  const folds = tr.querySelector('[data-key="folds"]');
+  const thread = tr.querySelector('[data-key="thread"]');
+  if (folds) folds.textContent=fmt(foldCount(d.height));
+  if (thread) thread.textContent=fmt(threadLength(d.width,d.height));
+  save();
+}
+
+function createRow(data={}){
+  const tr=document.createElement('tr');
+  tr.appendChild(makeCell(tr,'no',data.no||''));
+  tr.appendChild(makeCell(tr,'fabric',data.fabric||''));
+  tr.appendChild(makeCell(tr,'num',data.num||''));
+  tr.appendChild(makeCell(tr,'width',data.width||''));
+  tr.appendChild(makeCell(tr,'height',data.height||''));
+  tr.appendChild(makeCell(tr,'profile',data.profile||''));
+  tr.appendChild(makeCell(tr,'folds','0',false));
+  tr.appendChild(makeCell(tr,'color',data.color||''));
+  tr.appendChild(makeCell(tr,'thread','30',false));
+  document.getElementById('body').appendChild(tr);
+  recalc(tr);
+}
+
+function addRow(){ createRow(); save(); }
+function addEmptyRows(){ for(let i=0;i<10;i++) createRow(); save(); }
+
+function getAllRows(){
+  return [...document.querySelectorAll('#body tr')].map(tr=>{
+    const obj={};
+    tr.querySelectorAll('input').forEach(i=>obj[i.dataset.key]=i.value);
+    return obj;
+  });
+}
+
+function save(){
+  try { localStorage.setItem('plisseRows', JSON.stringify(getAllRows())); } catch(e) {}
+}
+
+function clearRows(){
+  if(!confirm('Очистить все строки?')) return;
+  try { localStorage.removeItem('plisseRows'); } catch(e) {}
+  document.getElementById('body').innerHTML='';
+  createRow(firstRow);
+  for(let i=1;i<START_ROWS;i++) createRow();
+}
+
+function normalizeRows(rows){
+  if (!Array.isArray(rows)) rows = [];
+  if (rows.length === 0) rows = [firstRow];
+  while (rows.length < START_ROWS) rows.push({});
+  return rows;
+}
 
 function cellFromTarget(target){
   if (!target || !target.closest) return null;
@@ -361,6 +175,15 @@ function toggleCell(td, force){
 function clearCellSelection(){
   document.querySelectorAll('#body td.selected-cell').forEach(td => td.classList.remove('selected-cell'));
   document.querySelectorAll('#body tr.sort-row').forEach(tr => tr.classList.remove('sort-row'));
+}
+
+function editCell(td){
+  const inp = td ? td.querySelector('input') : null;
+  if (!inp) return;
+  inp.readOnly = false;
+  inp.classList.add('editing');
+  inp.focus();
+  inp.select();
 }
 
 function getRowObject(tr){
@@ -379,7 +202,6 @@ function setRowObject(tr, obj){
 function selectedRowsFromCells(){
   const rows = [];
   const seen = new Set();
-
   document.querySelectorAll('#body td.selected-cell').forEach(td => {
     const tr = td.closest('tr');
     if (tr && !seen.has(tr)) {
@@ -387,7 +209,6 @@ function selectedRowsFromCells(){
       rows.push(tr);
     }
   });
-
   return rows;
 }
 
@@ -399,17 +220,11 @@ function sortSelectedCellsRows(){
     return;
   }
 
-  const data = selected.map((tr, index) => ({
-    index,
-    row: getRowObject(tr)
-  }));
+  const data = selected.map((tr, index) => ({ index, row: getRowObject(tr) }));
 
   data.sort((a, b) => {
-    const aw = n(a.row.width);
-    const bw = n(b.row.width);
-    const ah = n(a.row.height);
-    const bh = n(b.row.height);
-
+    const aw = n(a.row.width), bw = n(b.row.width);
+    const ah = n(a.row.height), bh = n(b.row.height);
     if (aw !== bw) return aw - bw;
     if (ah !== bh) return ah - bh;
     return a.index - b.index;
@@ -423,106 +238,55 @@ function sortSelectedCellsRows(){
   save();
 }
 
-function beginCellSelection(e){
-  const td = cellFromTarget(e.target);
-  if (!td || e.button !== 0) return;
-
-  const now = Date.now();
-  const isDoubleClick = lastClickCell === td && (now - lastClickTime) < 350;
-  lastClickTime = now;
-  lastClickCell = td;
-
-  // Double click enters edit mode.
-  if (isDoubleClick) {
-    const inp = td.querySelector('input');
-    if (inp) {
-      inp.focus();
-      inp.select();
-    }
-    return;
-  }
-
-  if (!e.ctrlKey && !e.metaKey && !e.shiftKey) clearCellSelection();
-
-  isSelectingCells = true;
-  lastPointerCell = td;
-  selectionModeAdd = !td.classList.contains('selected-cell');
-  toggleCell(td, selectionModeAdd);
-
-  // In Chrome, this prevents the input from swallowing the click and lets cells behave like Excel cells.
-  e.preventDefault();
-}
-
-function moveCellSelection(e){
-  if (!isSelectingCells) return;
-  const td = cellFromTarget(e.target);
-  if (!td || td === lastPointerCell) return;
-
-  lastPointerCell = td;
-  toggleCell(td, selectionModeAdd);
-  e.preventDefault();
-}
-
-function endCellSelection(){
-  isSelectingCells = false;
-  lastPointerCell = null;
-}
-
-function addCellSelectionHandler(tr){
-  // Handler is now delegated through #body. This function is kept for compatibility with createRow().
-}
-
 function installExcelSelection(){
   const body = document.getElementById('body');
-  if (!body || body.dataset.excelSelectionInstalled === '1') return;
-  body.dataset.excelSelectionInstalled = '1';
+  if (!body || body.dataset.installed === '1') return;
+  body.dataset.installed = '1';
 
-  body.addEventListener('mousedown', beginCellSelection, true);
-  body.addEventListener('mouseover', moveCellSelection, true);
-  document.addEventListener('mouseup', endCellSelection, true);
+  body.addEventListener('mousedown', function(e){
+    const td = cellFromTarget(e.target);
+    if (!td || e.button !== 0) return;
 
-  body.addEventListener('keydown', function(e){
+    if (e.detail >= 2) {
+      editCell(td);
+      e.preventDefault();
+      return;
+    }
+
+    if (!e.ctrlKey && !e.metaKey && !e.shiftKey) clearCellSelection();
+
+    isSelectingCells = true;
+    lastPointerCell = td;
+    selectionModeAdd = !td.classList.contains('selected-cell');
+    toggleCell(td, selectionModeAdd);
+    e.preventDefault();
+  }, true);
+
+  body.addEventListener('mouseover', function(e){
+    if (!isSelectingCells) return;
+    const td = cellFromTarget(e.target);
+    if (!td || td === lastPointerCell) return;
+    lastPointerCell = td;
+    toggleCell(td, selectionModeAdd);
+    e.preventDefault();
+  }, true);
+
+  body.addEventListener('dblclick', function(e){
     const td = cellFromTarget(e.target);
     if (!td) return;
+    editCell(td);
+    e.preventDefault();
+  }, true);
 
-    if (e.key === 'Enter') {
-      const inp = td.querySelector('input');
-      if (inp) {
-        inp.focus();
-        inp.select();
-        e.preventDefault();
-      }
-    }
+  document.addEventListener('mouseup', function(){
+    isSelectingCells = false;
+    lastPointerCell = null;
   }, true);
 
   document.addEventListener('keydown', function(e){
     if (e.key === 'Escape') clearCellSelection();
   });
 }
-
-function createRow(data={}){
-  const tr=document.createElement('tr');
-  tr.appendChild(makeCell(tr,'no',data.no||''));
-  tr.appendChild(makeCell(tr,'fabric',data.fabric||''));
-  tr.appendChild(makeCell(tr,'num',data.num||''));
-  tr.appendChild(makeCell(tr,'width',data.width||''));
-  tr.appendChild(makeCell(tr,'height',data.height||''));
-  tr.appendChild(makeCell(tr,'profile',data.profile||''));
-  tr.appendChild(makeCell(tr,'folds','0',false));
-  tr.appendChild(makeCell(tr,'color',data.color||''));
-  tr.appendChild(makeCell(tr,'thread','30',false));
-  document.getElementById('body').appendChild(tr); addCellSelectionHandlers(tr); recalc(tr);
-}
-function addRow(){ createRow(); save(); }
-function getAllRows(){ return [...document.querySelectorAll('#body tr')].map(tr=>{ const obj={}; tr.querySelectorAll('input').forEach(i=>obj[i.dataset.key]=i.value); return obj; }); }
-function save(){ localStorage.setItem('plisseRows', JSON.stringify(getAllRows())); }
-function clearRows(){ if(!confirm('Очистить все строки?')) return; localStorage.removeItem('plisseRows'); document.getElementById('body').innerHTML=''; createRow(firstRow); for(let i=1;i<START_ROWS;i++) createRow(); }
-(function init(){
-  const saved=localStorage.getItem('plisseRows');
-  const rows=saved ? JSON.parse(saved) : [firstRow, ...Array(START_ROWS-1).fill({})];
-  rows.forEach(createRow);
-  installExcelSelection();
-})();
 
 function printDocument() {
   try { save(); } catch (e) {}
@@ -548,10 +312,8 @@ async function makePdfBlob() {
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF('p', 'mm', 'a4');
 
-  const pageWidth = 210;
-  const pageHeight = 297;
-  const marginX = 8;
-  const marginY = 10;
+  const pageWidth = 210, pageHeight = 297;
+  const marginX = 8, marginY = 10;
   const usableWidth = pageWidth - marginX * 2;
   const usableHeight = pageHeight - marginY * 2;
 
@@ -565,7 +327,6 @@ async function makePdfBlob() {
     let position = marginY;
     pdf.addImage(imgData, 'JPEG', marginX, position, imgWidth, imgHeight);
     heightLeft -= usableHeight;
-
     while (heightLeft > 0) {
       pdf.addPage();
       position = marginY - (imgHeight - heightLeft);
@@ -618,6 +379,16 @@ async function sharePdfFile(event) {
   }
 }
 
+(function init(){
+  let rows = null;
+  try {
+    const saved=localStorage.getItem('plisseRows');
+    rows=saved ? JSON.parse(saved) : null;
+  } catch(e) {}
+  rows = normalizeRows(rows || [firstRow]);
+  rows.forEach(createRow);
+  installExcelSelection();
+})();
 </script>
 </body>
 </html>
