@@ -18,6 +18,11 @@
   .sheet input:focus{background:#fff7cc;box-shadow:inset 0 0 0 2px #f59e0b}
   .col-no{width:8mm}.col-fabric{width:25mm}.col-num{width:18mm}.col-width{width:23mm}.col-height{width:21mm}.col-profile{width:25mm}.col-folds{width:26mm}.col-color{width:21mm}.col-thread{width:28mm}
   .small{font-size:17px}.calc{background:#fff}
+
+  .sheet tr.selected-row td{background:#dbeafe}
+  .sheet tr.selected-row input{background:#dbeafe}
+  .sheet tr.selected-row input:focus{background:#fff7cc}
+
   @media print{
     body{background:white;margin:0}.toolbar{display:none}.page{box-shadow:none;margin:0;width:auto;min-height:auto;padding:0}.sheet th,.sheet td{border:1.8px solid #000} @page{size:A4 portrait;margin:10mm 8mm}
     .sheet input:focus{background:transparent;box-shadow:none}
@@ -223,8 +228,10 @@ async function sharePdfFile(event) {
   <button type="button" onclick="printDocument()">Печать</button>
   <button type="button" onclick="sharePdfFile(event)">Поделиться PDF</button>
   <button onclick="addRow()">Добавить строку</button>
+  <button type="button" onclick="sortSelectedRows()">Сортировать выделенное</button>
+  <button type="button" onclick="clearSelection()">Снять выделение</button>
   <button onclick="clearRows()">Очистить</button>
-  <span class="hint">Заполняйте белые ячейки. Складки и длина нитки считаются автоматически.</span>
+  <span class="hint">Заполняйте белые ячейки. Для сортировки нажмите на строки, затем «Сортировать выделенное».</span>
 </div>
 <div class="page">
 <table class="sheet" id="sheet">
@@ -253,6 +260,77 @@ function makeCell(row,key,value='',editable=true){
 }
 function rowData(tr){ const get=k=>tr.querySelector(`[data-key="${k}"]`)?.value ?? ''; return {width:get('width'),height:get('height')}; }
 function recalc(tr){ const d=rowData(tr); tr.querySelector('[data-key="folds"]').textContent=fmt(foldCount(d.height)); tr.querySelector('[data-key="thread"]').textContent=fmt(threadLength(d.width,d.height)); save(); }
+
+function getRowObject(tr){
+  const obj = {};
+  tr.querySelectorAll('input').forEach(i => obj[i.dataset.key] = i.value);
+  return obj;
+}
+
+function setRowObject(tr, obj){
+  tr.querySelectorAll('input').forEach(i => {
+    i.value = obj[i.dataset.key] || '';
+  });
+  recalc(tr);
+}
+
+function isEditableTarget(el){
+  return el && (el.tagName === 'INPUT' || el.tagName === 'BUTTON' || el.closest('button'));
+}
+
+function toggleRowSelection(tr){
+  if (!tr) return;
+  tr.classList.toggle('selected-row');
+}
+
+function clearSelection(){
+  document.querySelectorAll('#body tr.selected-row').forEach(tr => tr.classList.remove('selected-row'));
+}
+
+function addRowSelectionHandler(tr){
+  tr.addEventListener('click', function(e){
+    if (isEditableTarget(e.target)) return;
+    toggleRowSelection(tr);
+  });
+
+  tr.addEventListener('dblclick', function(e){
+    if (isEditableTarget(e.target)) return;
+    toggleRowSelection(tr);
+  });
+}
+
+function sortSelectedRows(){
+  const selected = [...document.querySelectorAll('#body tr.selected-row')];
+
+  if (selected.length < 2) {
+    alert('Выделите минимум 2 строки для сортировки.');
+    return;
+  }
+
+  const data = selected.map((tr, index) => ({
+    index,
+    row: getRowObject(tr)
+  }));
+
+  data.sort((a, b) => {
+    const aw = n(a.row.width);
+    const bw = n(b.row.width);
+    const ah = n(a.row.height);
+    const bh = n(b.row.height);
+
+    if (aw !== bw) return aw - bw;
+    if (ah !== bh) return ah - bh;
+    return a.index - b.index;
+  });
+
+  selected.forEach((tr, i) => {
+    setRowObject(tr, data[i].row);
+    tr.classList.add('selected-row');
+  });
+
+  save();
+}
+
 function createRow(data={}){
   const tr=document.createElement('tr');
   tr.appendChild(makeCell(tr,'no',data.no||''));
@@ -264,7 +342,7 @@ function createRow(data={}){
   tr.appendChild(makeCell(tr,'folds','0',false));
   tr.appendChild(makeCell(tr,'color',data.color||''));
   tr.appendChild(makeCell(tr,'thread','30',false));
-  document.getElementById('body').appendChild(tr); recalc(tr);
+  document.getElementById('body').appendChild(tr); addRowSelectionHandler(tr); recalc(tr);
 }
 function addRow(){ createRow(); save(); }
 function getAllRows(){ return [...document.querySelectorAll('#body tr')].map(tr=>{ const obj={}; tr.querySelectorAll('input').forEach(i=>obj[i.dataset.key]=i.value); return obj; }); }
