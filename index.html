@@ -8,7 +8,7 @@
   :root{--border:#111;--bg:#fff;--ui:#f3f4f6;--text:#111}
   body{margin:0;background:#e5e7eb;color:var(--text);font-family:Arial, sans-serif}
   .toolbar{position:sticky;top:0;z-index:10;background:#111827;color:white;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  .toolbar button{border:0;border-radius:6px;padding:8px 12px;cursor:pointer;background:#fff;color:#111;font-weight:600}
+  .toolbar button{border:0;border-radius:6px;padding:8px 12px;cursor:pointer;background:#fff;color:#111;font-weight:600}.toolbar button:disabled{opacity:.55;cursor:wait}
   .toolbar .hint{font-size:13px;opacity:.9}
   .page{width:210mm;min-height:297mm;margin:14px auto;background:var(--bg);box-shadow:0 2px 12px rgba(0,0,0,.18);padding:10mm 8mm;box-sizing:border-box}
   table.sheet{border-collapse:collapse;width:100%;table-layout:fixed;font-family:"Times New Roman", serif;font-size:18px}
@@ -23,11 +23,205 @@
     .sheet input:focus{background:transparent;box-shadow:none}
   }
 </style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js">
+function printDocument() {
+  try { save(); } catch (e) {}
+  window.focus();
+  window.print();
+}
+
+async function makePdfBlob() {
+  try { save(); } catch (e) {}
+
+  const page = document.querySelector('.page');
+  if (!page) throw new Error('Не найдена область страницы для PDF.');
+
+  const canvas = await html2canvas(page, {
+    scale: 2,
+    useCORS: true,
+    backgroundColor: '#ffffff',
+    scrollX: 0,
+    scrollY: -window.scrollY
+  });
+
+  const imgData = canvas.toDataURL('image/jpeg', 0.98);
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p', 'mm', 'a4');
+
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const marginX = 8;
+  const marginY = 10;
+  const usableWidth = pageWidth - marginX * 2;
+  const usableHeight = pageHeight - marginY * 2;
+
+  const imgWidth = usableWidth;
+  const imgHeight = canvas.height * imgWidth / canvas.width;
+
+  if (imgHeight <= usableHeight) {
+    pdf.addImage(imgData, 'JPEG', marginX, marginY, imgWidth, imgHeight);
+  } else {
+    let heightLeft = imgHeight;
+    let position = marginY;
+    pdf.addImage(imgData, 'JPEG', marginX, position, imgWidth, imgHeight);
+    heightLeft -= usableHeight;
+
+    while (heightLeft > 0) {
+      pdf.addPage();
+      position = marginY - (imgHeight - heightLeft);
+      pdf.addImage(imgData, 'JPEG', marginX, position, imgWidth, imgHeight);
+      heightLeft -= usableHeight;
+    }
+  }
+
+  return pdf.output('blob');
+}
+
+async function sharePdfFile(event) {
+  const btn = event && event.currentTarget ? event.currentTarget : null;
+  const oldText = btn ? btn.textContent : '';
+
+  try {
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Создаём PDF...';
+    }
+
+    const pdfBlob = await makePdfBlob();
+    const file = new File([pdfBlob], 'plisse_raschet.pdf', { type: 'application/pdf' });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+      await navigator.share({
+        title: 'Расчёт плиссе',
+        text: 'Расчёт плиссе в PDF',
+        files: [file]
+      });
+    } else {
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'plisse_raschet.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      alert('PDF сохранён. Теперь его можно отправить через WhatsApp.');
+    }
+  } catch (err) {
+    alert('Не удалось создать PDF. Попробуйте открыть страницу в Safari/Chrome и нажать «Поделиться PDF» ещё раз.');
+    console.error(err);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = oldText || 'Поделиться PDF';
+    }
+  }
+}
+
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js">
+function printDocument() {
+  try { save(); } catch (e) {}
+  window.focus();
+  window.print();
+}
+
+async function makePdfBlob() {
+  try { save(); } catch (e) {}
+
+  const page = document.querySelector('.page');
+  if (!page) throw new Error('Не найдена область страницы для PDF.');
+
+  const canvas = await html2canvas(page, {
+    scale: 2,
+    useCORS: true,
+    backgroundColor: '#ffffff',
+    scrollX: 0,
+    scrollY: -window.scrollY
+  });
+
+  const imgData = canvas.toDataURL('image/jpeg', 0.98);
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p', 'mm', 'a4');
+
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const marginX = 8;
+  const marginY = 10;
+  const usableWidth = pageWidth - marginX * 2;
+  const usableHeight = pageHeight - marginY * 2;
+
+  const imgWidth = usableWidth;
+  const imgHeight = canvas.height * imgWidth / canvas.width;
+
+  if (imgHeight <= usableHeight) {
+    pdf.addImage(imgData, 'JPEG', marginX, marginY, imgWidth, imgHeight);
+  } else {
+    let heightLeft = imgHeight;
+    let position = marginY;
+    pdf.addImage(imgData, 'JPEG', marginX, position, imgWidth, imgHeight);
+    heightLeft -= usableHeight;
+
+    while (heightLeft > 0) {
+      pdf.addPage();
+      position = marginY - (imgHeight - heightLeft);
+      pdf.addImage(imgData, 'JPEG', marginX, position, imgWidth, imgHeight);
+      heightLeft -= usableHeight;
+    }
+  }
+
+  return pdf.output('blob');
+}
+
+async function sharePdfFile(event) {
+  const btn = event && event.currentTarget ? event.currentTarget : null;
+  const oldText = btn ? btn.textContent : '';
+
+  try {
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Создаём PDF...';
+    }
+
+    const pdfBlob = await makePdfBlob();
+    const file = new File([pdfBlob], 'plisse_raschet.pdf', { type: 'application/pdf' });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+      await navigator.share({
+        title: 'Расчёт плиссе',
+        text: 'Расчёт плиссе в PDF',
+        files: [file]
+      });
+    } else {
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'plisse_raschet.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      alert('PDF сохранён. Теперь его можно отправить через WhatsApp.');
+    }
+  } catch (err) {
+    alert('Не удалось создать PDF. Попробуйте открыть страницу в Safari/Chrome и нажать «Поделиться PDF» ещё раз.');
+    console.error(err);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = oldText || 'Поделиться PDF';
+    }
+  }
+}
+
+</script>
+
 </head>
 <body>
 <div class="toolbar">
   <button type="button" onclick="printDocument()">Печать</button>
-  <button type="button" onclick="shareOrPrint()">Поделиться / PDF</button>
+  <button type="button" onclick="sharePdfFile(event)">Поделиться PDF</button>
   <button onclick="addRow()">Добавить строку</button>
   <button onclick="clearRows()">Очистить</button>
   <span class="hint">Заполняйте белые ячейки. Складки и длина нитки считаются автоматически.</span>
@@ -83,31 +277,97 @@ function clearRows(){ if(!confirm('Очистить все строки?')) retu
 })();
 
 function printDocument() {
-  try {
-    save();
-  } catch (e) {}
+  try { save(); } catch (e) {}
   window.focus();
-
-  // Main print call. Works in Chrome/Edge/desktop Safari.
-  try {
-    window.print();
-  } catch (e) {
-    alert('Если печать не открылась: нажмите кнопку «Поделиться / PDF» или меню браузера → Печать.');
-  }
+  window.print();
 }
 
-async function shareOrPrint() {
-  try {
-    if (navigator.share) {
-      await navigator.share({
-        title: document.title,
-        url: window.location.href
-      });
-      return;
-    }
-  } catch (e) {}
+async function makePdfBlob() {
+  try { save(); } catch (e) {}
 
-  alert('На iPhone: нажмите кнопку «Поделиться» в Safari → Печать → Сохранить как PDF или распечатать.');
+  const page = document.querySelector('.page');
+  if (!page) throw new Error('Не найдена область страницы для PDF.');
+
+  const canvas = await html2canvas(page, {
+    scale: 2,
+    useCORS: true,
+    backgroundColor: '#ffffff',
+    scrollX: 0,
+    scrollY: -window.scrollY
+  });
+
+  const imgData = canvas.toDataURL('image/jpeg', 0.98);
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p', 'mm', 'a4');
+
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const marginX = 8;
+  const marginY = 10;
+  const usableWidth = pageWidth - marginX * 2;
+  const usableHeight = pageHeight - marginY * 2;
+
+  const imgWidth = usableWidth;
+  const imgHeight = canvas.height * imgWidth / canvas.width;
+
+  if (imgHeight <= usableHeight) {
+    pdf.addImage(imgData, 'JPEG', marginX, marginY, imgWidth, imgHeight);
+  } else {
+    let heightLeft = imgHeight;
+    let position = marginY;
+    pdf.addImage(imgData, 'JPEG', marginX, position, imgWidth, imgHeight);
+    heightLeft -= usableHeight;
+
+    while (heightLeft > 0) {
+      pdf.addPage();
+      position = marginY - (imgHeight - heightLeft);
+      pdf.addImage(imgData, 'JPEG', marginX, position, imgWidth, imgHeight);
+      heightLeft -= usableHeight;
+    }
+  }
+
+  return pdf.output('blob');
+}
+
+async function sharePdfFile(event) {
+  const btn = event && event.currentTarget ? event.currentTarget : null;
+  const oldText = btn ? btn.textContent : '';
+
+  try {
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Создаём PDF...';
+    }
+
+    const pdfBlob = await makePdfBlob();
+    const file = new File([pdfBlob], 'plisse_raschet.pdf', { type: 'application/pdf' });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+      await navigator.share({
+        title: 'Расчёт плиссе',
+        text: 'Расчёт плиссе в PDF',
+        files: [file]
+      });
+    } else {
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'plisse_raschet.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      alert('PDF сохранён. Теперь его можно отправить через WhatsApp.');
+    }
+  } catch (err) {
+    alert('Не удалось создать PDF. Попробуйте открыть страницу в Safari/Chrome и нажать «Поделиться PDF» ещё раз.');
+    console.error(err);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = oldText || 'Поделиться PDF';
+    }
+  }
 }
 
 </script>
