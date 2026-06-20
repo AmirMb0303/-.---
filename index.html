@@ -14,12 +14,12 @@
   table.sheet{border-collapse:collapse;width:100%;table-layout:fixed;font-family:"Times New Roman", serif;font-size:18px}
   .sheet th,.sheet td{border:2px solid var(--border);height:24px;text-align:center;vertical-align:middle;padding:0 4px;box-sizing:border-box;line-height:1.05}
   .sheet th{font-weight:700;background:#fff}
-  .sheet td{cursor:cell;position:relative;user-select:none}
+  .sheet td{cursor:cell;position:relative;user-select:none;-webkit-user-select:none;touch-action:none}
   .sheet td.selected-cell{background:#bfdbfe!important;box-shadow:inset 0 0 0 2px #2563eb}
   .sheet td.selected-cell input{background:#bfdbfe!important}
   .sheet tr.sort-row td{background:#dbeafe}
   .sheet tr.sort-row input{background:#dbeafe}
-  .sheet input{width:100%;height:100%;border:0;outline:none;text-align:center;font:inherit;font-family:"Times New Roman", serif;background:transparent;padding:0;box-sizing:border-box;pointer-events:none;user-select:text}
+  .sheet input{width:100%;height:100%;border:0;outline:none;text-align:center;font:inherit;font-family:"Times New Roman", serif;background:transparent;padding:0;box-sizing:border-box;pointer-events:none;user-select:text;-webkit-user-select:text}
   .sheet input.editing{pointer-events:auto;background:#fff7cc!important;box-shadow:inset 0 0 0 2px #f59e0b}
   .sheet input:focus{background:#fff7cc;box-shadow:inset 0 0 0 2px #f59e0b}
   .col-no{width:8mm}.col-fabric{width:25mm}.col-num{width:18mm}.col-width{width:23mm}.col-height{width:21mm}.col-profile{width:25mm}.col-folds{width:26mm}.col-color{width:21mm}.col-thread{width:28mm}
@@ -132,8 +132,6 @@ function createRow(data={}){
 }
 
 function addRow(){ createRow(); save(); }
-function addEmptyRows(){ for(let i=0;i<10;i++) createRow(); save(); }
-
 function getAllRows(){
   return [...document.querySelectorAll('#body tr')].map(tr=>{
     const obj={};
@@ -243,7 +241,29 @@ function installExcelSelection(){
   if (!body || body.dataset.installed === '1') return;
   body.dataset.installed = '1';
 
-  body.addEventListener('mousedown', function(e){
+  function cellAtPoint(x, y){
+    const el = document.elementFromPoint(x, y);
+    return cellFromTarget(el);
+  }
+
+  function startSelection(td, e){
+    if (!td) return;
+
+    if (!e.ctrlKey && !e.metaKey && !e.shiftKey) clearCellSelection();
+
+    isSelectingCells = true;
+    lastPointerCell = td;
+    selectionModeAdd = !td.classList.contains('selected-cell');
+    toggleCell(td, selectionModeAdd);
+  }
+
+  function moveSelection(td){
+    if (!isSelectingCells || !td || td === lastPointerCell) return;
+    lastPointerCell = td;
+    toggleCell(td, selectionModeAdd);
+  }
+
+  body.addEventListener('pointerdown', function(e){
     const td = cellFromTarget(e.target);
     if (!td || e.button !== 0) return;
 
@@ -253,29 +273,57 @@ function installExcelSelection(){
       return;
     }
 
-    if (!e.ctrlKey && !e.metaKey && !e.shiftKey) clearCellSelection();
+    if (e.pointerType === 'mouse' && e.buttons !== 1) return;
+    startSelection(td, e);
 
-    isSelectingCells = true;
-    lastPointerCell = td;
-    selectionModeAdd = !td.classList.contains('selected-cell');
-    toggleCell(td, selectionModeAdd);
+    try { body.setPointerCapture(e.pointerId); } catch(_) {}
     e.preventDefault();
   }, true);
 
-  body.addEventListener('mouseover', function(e){
+  body.addEventListener('pointermove', function(e){
     if (!isSelectingCells) return;
-    const td = cellFromTarget(e.target);
-    if (!td || td === lastPointerCell) return;
-    lastPointerCell = td;
-    toggleCell(td, selectionModeAdd);
+    const td = cellAtPoint(e.clientX, e.clientY);
+    moveSelection(td);
     e.preventDefault();
   }, true);
+
+  function stopSelection(e){
+    isSelectingCells = false;
+    lastPointerCell = null;
+    try { body.releasePointerCapture(e.pointerId); } catch(_) {}
+  }
+
+  body.addEventListener('pointerup', stopSelection, true);
+  body.addEventListener('pointercancel', stopSelection, true);
 
   body.addEventListener('dblclick', function(e){
     const td = cellFromTarget(e.target);
     if (!td) return;
     editCell(td);
     e.preventDefault();
+  }, true);
+
+  // Запасной вариант для старых мобильных браузеров, где Pointer Events работают нестабильно.
+  body.addEventListener('touchstart', function(e){
+    if (!e.touches || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const td = cellAtPoint(t.clientX, t.clientY);
+    if (!td) return;
+    startSelection(td, e);
+    e.preventDefault();
+  }, {capture:true, passive:false});
+
+  body.addEventListener('touchmove', function(e){
+    if (!isSelectingCells || !e.touches || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const td = cellAtPoint(t.clientX, t.clientY);
+    moveSelection(td);
+    e.preventDefault();
+  }, {capture:true, passive:false});
+
+  body.addEventListener('touchend', function(){
+    isSelectingCells = false;
+    lastPointerCell = null;
   }, true);
 
   document.addEventListener('mouseup', function(){
