@@ -80,6 +80,14 @@ function clearRows(){ if(!confirm('Очистить все строки?')) retu
   const rows=saved ? JSON.parse(saved) : [firstRow, ...Array(START_ROWS-1).fill({})];
   rows.forEach(createRow);
 })();
+
+function printDocument() {
+  window.focus();
+  setTimeout(() => {
+    window.print();
+  }, 300);
+}
 </script>
+
 </body>
 </html>
